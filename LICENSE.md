@@ -29,14 +29,14 @@ js/geo.js  js/shards.js  js/icons.js  js/data.js  js/app.js
 AGPL-3.0 est aussi la licence du code de **[mon-pk](https://github.com/olimil31/mon-pk)**
 dont proviennent les points PK : les deux projets restent cohérents.
 
-Texte intégral : <https://www.gnu.org/licenses/agpl-3.0.html>
+**Texte intégral : [`AGPL-3.0.txt`](AGPL-3.0.txt)** — 34 523 octets, récupéré tel quel
+depuis <https://www.gnu.org/licenses/agpl-3.0.txt>.
 
-> **À faire avant publication :** coller le texte intégral dans un fichier
-> `AGPL-3.0.txt` à la racine. GitHub ne détecte pas la licence sans fichier
-> `LICENSE` à la racine.
+> GitHub ne détecte la licence que s'il trouve un fichier `LICENSE` **ou**
+> `AGPL-3.0.txt` à la racine. Les deux sont présents.
 
 Pour changer de licence, c'est la ligne `AGPL-3.0` ci-dessus qu'on modifie —
-rien d'autre dans le dépôt ne dépend du choix.
+rien d'autre dans le dépôt n'en dépend.
 
 ---
 
@@ -57,14 +57,13 @@ inversement.
 
 ### Texte de la licence
 
-Le texte intégral et faisant foi de l'ODbL 1.0 est publié ici :
-<https://opendatacommons.org/licenses/odbl/1-0/>
+**Texte intégral : [`ODBL-1.0.html`](ODBL-1.0.html)** — 51 176 octets, code juridique
+complet récupéré tel quel depuis <https://opendatacommons.org/licenses/odbl/1-0/>
+(Préambule et §1 Définitions → §10 Dispositions générales, §4.3 inclus).
 
-> **À faire avant publication :** coller le texte intégral de l'ODbL 1.0
-> dans un fichier `ODBL-1.0.txt` à la racine du dépôt, et l'afficher dans
-> l'application (section « Réglages → Sources et licences »). Les liens ne
-> satisfont pas l'exigence d'attribution : l'attribution doit être présente dans
-> l'objet lui-même.
+L'attribution est également affichée **dans l'application**
+(*Réglages → Sources et licences*), comme l'exige l'ODbL : un lien seul ne
+satisfait pas l'obligation.
 
 ### Sources et attribution
 

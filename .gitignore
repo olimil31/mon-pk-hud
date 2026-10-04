@@ -1,0 +1,29 @@
+# Editeurs / OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Credentials — ne doivent JAMAIS etre pousses
+gitenv.txt
+.env
+.env.*
+*.env
+*.token
+
+# Saisie CODELI en cours (donnees personnelles, non partagees)
+data/signals_local.local.js
+
+# Divers
+*.log
+*.tmp
+*.bak
+.vscode/
+.idea/
+
+# Scripts d'extraction (futurs)
+node_modules/
+npm-debug.log*
+
+# Tests temporaires
+_t.html
+_dbg.html

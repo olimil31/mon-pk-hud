@@ -1,0 +1,21 @@
+{
+  "name": "Mon PK — HUD Conducteur",
+  "short_name": "Mon PK",
+  "description": "Aide à la situation : PK, vitesse, sens/voie, signaux, PN et gares à venir. Données indicatives, non garanties.",
+  "id": "/mon-pk-hud/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#05080c",
+  "theme_color": "#05080c",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["navigation", "travel"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

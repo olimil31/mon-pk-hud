@@ -12,7 +12,7 @@
    ⚠ À FAIRE : incrémenter VERSION à chaque déploiement.
    ===================================================================== */
 
-var VERSION = 'v4';
+var VERSION = 'v5';
 var SHELL = VERSION + '-shell';
 var SHARDS = VERSION + '-shards';
 

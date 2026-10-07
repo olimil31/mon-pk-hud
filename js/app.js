@@ -815,37 +815,69 @@
   }
 
   /* ----------------------- Panneau diagnostic ---------------------- */
+  function coveredLines() {
+    var out = [];
+    if (typeof sncfVmax !== 'undefined') for (var k in sncfVmax) if (out.indexOf(k) === -1) out.push(k);
+    if (typeof sncfGares !== 'undefined') for (var j in sncfGares) if (out.indexOf(j) === -1) out.push(j);
+    if (typeof sigmapSignals !== 'undefined') {
+      for (var i = 0; i < sigmapSignals.length; i++) {
+        var l = sigmapSignals[i].line;
+        if (out.indexOf(l) === -1) out.push(l);
+      }
+    }
+    return out;
+  }
+
   function renderDiagnostics() {
     var box = $('diag-box');
     if (!box) return;
     var seuil = state.acceptM || 500;
     var L = ['position ' + (state.lat !== null ? state.lat.toFixed(5) + ', ' + state.lon.toFixed(5) : '—') +
-             '  ±' + (state.precision ? Math.round(state.precision) : '?') + ' m  seuil ' + seuil + ' m'];
+             '   précision ' + (state.precision ? Math.round(state.precision) : '?') + ' m' +
+             '   rayon ' + seuil + ' m'];
     var d = state.diag;
-    if (!d) { L.push('aucun essai de localisation encore.'); box.textContent = L.join('\n'); return; }
 
-    if (d.why === 'ok') {
+    if (!d) {
+      L.push('');
+      L.push('Aucun essai de localisation.');
+      L.push(state.mode === 'sim' ? 'Mode simulation : le GPS n a pas encore donné de position.' :
+                                  'En attente d une position GPS…');
+    } else if (d.why === 'ok') {
+      L.push('');
       L.push('OK — ligne ' + state.line + ' au PK ' + (state.pk === null ? '—' : state.pk.toFixed(2)));
       if (d.nearest) L.push('distance à la voie : ' + d.nearest.dist + ' m');
+      if (state.line && !lineHasEnrichment(state.line)) {
+        L.push('signaux / VL / gares : NON COUVERTS pour la ligne ' + state.line + '.');
+        L.push('lignes couvertes en signaux : ' + coveredLines().join(', '));
+        L.push('→ pour tester l affichage complet : Réglages → Forcer ligne.');
+      }
     } else if (d.why === 'hors-emprises') {
-      L.push('CAUSE : aucune des 1005 emprises de lignes ne contient cette position.');
-      L.push('→ il n’y a probablement aucune voie du RFN ici. Utiliser « Position manuelle » avec un PK connu.');
+      L.push('');
+      L.push('CAUSE : aucune des ' + PkStore.zoneCount() + ' emprises de lignes ne contient');
+      L.push('cette position. Il n y a probablement aucune voie cartographiée ici.');
+      L.push('→ vérifie le rayon, ou utilise « Position manuelle » avec un PK connu.');
     } else if (d.why === 'donnees-indisponibles') {
+      L.push('');
       L.push('CAUSE : lignes candidates trouvées, aucune géométrie chargée.');
       L.push('candidates : ' + ((d.candidates || []).join(', ') || '—'));
       L.push('chargées   : ' + ((d.loaded || []).join(', ') || 'aucune'));
       L.push('échouées   : ' + ((d.failed || []).join(', ') || 'aucune'));
-      L.push('→ échec réseau ou shard indisponible pour ces lignes.');
+      L.push('→ échec réseau, ou shard absent en amont pour ces lignes.');
     } else if (d.why === 'voie-trop-loin') {
-      L.push('CAUSE : la voie la plus proche dépasse le seuil.');
+      L.push('');
+      L.push('CAUSE : la voie la plus proche est au-delà du rayon de ' + seuil + ' m.');
       L.push('candidates : ' + (d.candidates || []).length + ' — chargées : ' +
              ((d.loaded || []).join(', ') || 'aucune'));
       if (d.nearest) {
         L.push('plus proche : ligne ' + d.nearest.line + ' à ' + d.nearest.dist + ' m (PK ' + d.nearest.pk.toFixed(1) + ')');
       }
+      L.push('→ monte le rayon d acceptation, ou rapproche-toi de la voie.');
     } else {
+      L.push('');
       L.push('CAUSE : ' + (d.why || '?') + (d.message ? ' — ' + d.message : ''));
     }
+    L.push('');
+    L.push('lignes avec signaux/VL/gares : ' + coveredLines().join(', '));
     box.textContent = L.join('\n');
   }
 
@@ -1087,7 +1119,10 @@
     b.textContent = state.mode === 'sim' ? '🛠 Simu' : (state.mode === 'gps' ? '📡 GPS' : '⏸ Arrêt');
     b.setAttribute('data-mode', state.mode);
   }
-  function openSettings() { $('settings').classList.remove('hidden'); }
+  function openSettings() {
+    $('settings').classList.remove('hidden');
+    renderDiagnostics();   // le panneau ne doit jamais rester vide
+  }
   function closeSettings() { $('settings').classList.add('hidden'); }
 
   function populateSettings() {
@@ -1240,6 +1275,9 @@
     bind();
     renderReminderList();
     startClock();
+    // Rafraîchit le panneau de diagnostic même sans fix GPS : sans cela il
+    // restait vide (« — ») tant que le GPS n'avait rien donné.
+    setInterval(renderDiagnostics, 2000);
 
     if (typeof routes !== 'undefined' && routes['650000']) {
       state.sim.route = '650000';

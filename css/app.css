@@ -380,6 +380,12 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 .settings .note { font-size: 0.74rem; color: var(--text-dim); line-height: 1.35; }
 
 .reminder-list { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }
+.diag {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.68rem; line-height: 1.35; white-space: pre-wrap;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.5rem; color: var(--text); overflow-x: auto;
+}
 .reminder-item {
   display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;

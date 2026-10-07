@@ -15,6 +15,8 @@
     windowBackKm: 3,
     scope: 'all',
     sensOverride: 0,      // 0 = auto, 1/-1 = sens impose
+    acceptM: 500,        // rayon d'acceptation GPS -> voie
+    diag: null,           // dernier diagnostic de localisation
     dirSource: 'defaut',   // 'defaut' = sens normal presume, 'gps' = mesure
     sources: { sigmap: true, osm: true, codeli: true },
     showPn: true,
@@ -756,25 +758,26 @@
     state.lat = coords.latitude;
     state.lon = coords.longitude;
 
-    var maxDist = (coords.accuracy && coords.accuracy > 200) ? 800 : 500;
+    var maxDist = state.acceptM || 500;
     var opts = { maxDist: maxDist, prefer: state.lastLine || null };
     if (state.manualLine) { opts.line = state.manualLine; opts.prefer = state.manualLine; }
 
     state.fixBusy = true;
     if (!state.line) setStatus('Chargement de la ligne...', 'warn');
 
-    PkStore.locate(coords.latitude, coords.longitude, opts).then(function (loc) {
+    PkStore.locate(coords.latitude, coords.longitude, opts).then(function (res) {
       state.fixBusy = false;
-      if (loc) {
-        state.line = loc.line;
-        state.lastLine = loc.line;
-        state.pk = loc.pk;
-        state.offset = loc.offset;
-        state.smoothOffset = state.smoothOffset * 0.7 + loc.offset * 0.3;
-        updateDirectionFromFix(loc.pk, coords.heading, loc.segBearing);
+      state.diag = res.diag;
+      if (res.ok) {
+        state.line = res.line;
+        state.lastLine = res.line;
+        state.pk = res.pk;
+        state.offset = res.offset;
+        state.smoothOffset = state.smoothOffset * 0.7 + res.offset * 0.3;
+        updateDirectionFromFix(res.pk, coords.heading, res.segBearing);
         applySensOverride();
         state.heading = (typeof coords.heading === 'number' ? coords.heading : null);
-        state.lastPk = loc.pk;
+        state.lastPk = res.pk;
         state.lastPkTs = Date.now();
 
         var v = null;
@@ -784,14 +787,66 @@
         if (coords.accuracy && coords.accuracy > 100) setStatus('GPS ±' + Math.round(coords.accuracy) + ' m', 'warn');
         else setStatus('GPS actif', 'ok');
       } else {
-        setStatus(state.manualLine ? ('Ligne ' + state.manualLine + ' indisponible') : 'Hors zone connue', 'error');
+        setStatus(failureMessage(res.diag), 'error');
       }
       renderAll();
-    }, function () {
+      renderDiagnostics();
+    }, function (err) {
       state.fixBusy = false;
-      setStatus('Données PK indisponibles', 'error');
+      state.diag = { why: 'exception', message: (err && err.message) || String(err) };
+      setStatus(failureMessage(state.diag), 'error');
       renderAll();
+      renderDiagnostics();
     });
+  }
+
+  /* Un échec de localisation a quatre causes très différentes. Les distinguer est
+     indispensable : « hors zone connue » seul ne permet ni de diagnostiquer un
+     test sur téléphone, ni de corriger. */
+  function failureMessage(d) {
+    if (!d) return 'Position inconnue';
+    if (d.why === 'hors-emprises') return 'Aucune ligne autour de cette position';
+    if (d.why === 'donnees-indisponibles') return 'Ligne trouvée, données indisponibles';
+    if (d.why === 'voie-trop-loin' && d.nearest) {
+      return 'Voie la plus proche à ' + fmtDist(d.nearest.dist) + ' (seuil ' + d.maxDist + ' m)';
+    }
+    if (d.why === 'exception') return 'Erreur : ' + (d.message || '?');
+    return 'Position non localisée';
+  }
+
+  /* ----------------------- Panneau diagnostic ---------------------- */
+  function renderDiagnostics() {
+    var box = $('diag-box');
+    if (!box) return;
+    var seuil = state.acceptM || 500;
+    var L = ['position ' + (state.lat !== null ? state.lat.toFixed(5) + ', ' + state.lon.toFixed(5) : '—') +
+             '  ±' + (state.precision ? Math.round(state.precision) : '?') + ' m  seuil ' + seuil + ' m'];
+    var d = state.diag;
+    if (!d) { L.push('aucun essai de localisation encore.'); box.textContent = L.join('\n'); return; }
+
+    if (d.why === 'ok') {
+      L.push('OK — ligne ' + state.line + ' au PK ' + (state.pk === null ? '—' : state.pk.toFixed(2)));
+      if (d.nearest) L.push('distance à la voie : ' + d.nearest.dist + ' m');
+    } else if (d.why === 'hors-emprises') {
+      L.push('CAUSE : aucune des 1005 emprises de lignes ne contient cette position.');
+      L.push('→ il n’y a probablement aucune voie du RFN ici. Utiliser « Position manuelle » avec un PK connu.');
+    } else if (d.why === 'donnees-indisponibles') {
+      L.push('CAUSE : lignes candidates trouvées, aucune géométrie chargée.');
+      L.push('candidates : ' + ((d.candidates || []).join(', ') || '—'));
+      L.push('chargées   : ' + ((d.loaded || []).join(', ') || 'aucune'));
+      L.push('échouées   : ' + ((d.failed || []).join(', ') || 'aucune'));
+      L.push('→ échec réseau ou shard indisponible pour ces lignes.');
+    } else if (d.why === 'voie-trop-loin') {
+      L.push('CAUSE : la voie la plus proche dépasse le seuil.');
+      L.push('candidates : ' + (d.candidates || []).length + ' — chargées : ' +
+             ((d.loaded || []).join(', ') || 'aucune'));
+      if (d.nearest) {
+        L.push('plus proche : ligne ' + d.nearest.line + ' à ' + d.nearest.dist + ' m (PK ' + d.nearest.pk.toFixed(1) + ')');
+      }
+    } else {
+      L.push('CAUSE : ' + (d.why || '?') + (d.message ? ' — ' + d.message : ''));
+    }
+    box.textContent = L.join('\n');
   }
 
   function onGpsError(err) {
@@ -941,21 +996,27 @@
     if (isNaN(lat) || isNaN(lon)) { setStatus('Coordonnées invalides', 'error'); return; }
     setStatus('Chargement...', 'warn');
     PkStore.locate(lat, lon, { maxDist: 2000, prefer: state.lastLine || null })
-      .then(function (loc) {
-        if (!loc) { setStatus('Aucune voie à proximité', 'error'); return; }
+      .then(function (res) {
+        state.diag = res.diag;
+        if (!res.ok) { setStatus(failureMessage(res.diag), 'error'); renderDiagnostics(); return; }
         state.mode = 'idle';
-        state.line = loc.line;
-        state.lastLine = loc.line;
-        state.pk = loc.pk;
+        state.line = res.line;
+        state.lastLine = res.line;
+        state.pk = res.pk;
         state.lat = lat;
         state.lon = lon;
-        state.offset = loc.offset;
-        state.smoothOffset = loc.offset;
+        state.offset = res.offset;
+        state.smoothOffset = res.offset;
         state.speedKmh = null;
         state.dirSign = state.sim.dirSign || 1;
         setStatus('Position manuelle', 'warn');
         renderAll();
-      }, function () { setStatus('Données PK indisponibles', 'error'); });
+        renderDiagnostics();
+      }, function (err) {
+        state.diag = { why: 'exception', message: (err && err.message) || String(err) };
+        setStatus(failureMessage(state.diag), 'error');
+        renderDiagnostics();
+      });
   }
 
   /* ---------------------- Rechargement OSM live --------------- */
@@ -1097,6 +1158,10 @@
     $('sel-window-back').addEventListener('change', function () { state.windowBackKm = parseFloat(this.value); renderSignals(); });
     $('sel-scope').addEventListener('change', function () { state.scope = this.value; renderSignals(); });
     $('sel-line').addEventListener('change', function () { state.manualLine = this.value || null; });
+    $('sel-accept').addEventListener('change', function () {
+      state.acceptM = parseInt(this.value, 10) || 500;
+      renderDiagnostics();
+    });
     $('sel-track').addEventListener('change', function () { state.manualTrackSide = this.value || null; renderAll(); });
     $('sel-sens').addEventListener('change', function () {
       state.sensOverride = parseInt(this.value, 10) || 0;
@@ -1122,6 +1187,22 @@
     $('btn-sim-step').addEventListener('click', simStep);
     $('btn-sim-reset').addEventListener('click', simReset);
     $('btn-manual').addEventListener('click', testManual);
+    $('btn-diag').addEventListener('click', function () {
+      renderDiagnostics();
+      if (state.lat !== null && state.lon !== null) testManual();
+      else refreshNow();
+    });
+    $('btn-clear-cache').addEventListener('click', function () {
+      try {
+        var n = 0;
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('monpk.pk.') === 0) { localStorage.removeItem(k); n++; }
+        }
+        setStatus(n + ' ligne(s) retirée(s) du cache', 'ok');
+      } catch (e) { setStatus('Cache inaccessible', 'warn'); }
+      renderDiagnostics();
+    });
     $('btn-reload-osm').addEventListener('click', reloadOsm);
 
     $('btn-rem-add').addEventListener('click', addReminder);

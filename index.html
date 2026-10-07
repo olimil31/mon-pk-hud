@@ -173,6 +173,21 @@
         <select id="sel-line"><option value="">Auto</option></select>
       </div>
       <div class="row">
+        <label for="sel-accept">Rayon d'acceptation</label>
+        <select id="sel-accept">
+          <option value="300">300 m (strict)</option>
+          <option value="500" selected>500 m</option>
+          <option value="1000">1 km</option>
+          <option value="2000">2 km</option>
+          <option value="5000">5 km (test à pied)</option>
+        </select>
+      </div>
+      <div class="note">
+        Distance maximale entre la position GPS et la voie pour accepter la
+        localisation. En train, 500 m suffisent largement. Au-delà, mieux vaut
+        ne rien afficher qu'afficher le PK d'une voie sur laquelle on n'est pas.
+      </div>
+      <div class="row">
         <label for="chk-pn">Passages à niveau</label>
         <input id="chk-pn" type="checkbox" checked />
       </div>
@@ -288,6 +303,22 @@
         <button id="btn-sim-play" class="primary">▶ Lancer</button>
         <button id="btn-sim-step">+ Pas</button>
         <button id="btn-sim-reset">↺ Départ</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Diagnostic de localisation</h3>
+      <pre id="diag-box" class="diag">—</pre>
+      <div class="row">
+        <button id="btn-diag">↻ Relancer une localisation</button>
+        <button id="btn-clear-cache">Vider le cache des lignes</button>
+      </div>
+      <div class="note">
+        À lire en cas de « hors zone connue » ou d'un échec. Les échecs ont
+        quatre causes distinctes : aucune ligne dans les emprises autour de la
+        position, lignes trouvées mais géométrie non chargée (réseau), voie la
+        plus proche au-delà du seuil de 500 m, ou exception. Le panneau
+        indique laquelle.
       </div>
     </section>
 

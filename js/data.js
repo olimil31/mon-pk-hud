@@ -69,28 +69,51 @@ var PkStore = (function () {
 
   function ensureAll(codes) {
     return Promise.all(codes.map(function (c) {
-      return ensure(c).catch(function () { return null; });
+      return ensure(c).then(function () { return c; }, function () { return null; });
     }));
   }
 
   /* Localisation. Asynchrone : le découpage par zone évite de charger
      toute la France, et `prefer` garde la ligne courante en tête (les
-     emprises se chevauchent aux bifurcations). */
+     emprises se chevauchent aux bifurcations).
+
+     Ne renvoie plus `null` mais un objet résultat :
+       { ok: true, line, pk, dist, offset, segBearing, diag }
+       { ok: false, diag }
+     `diag.why` distingue les échecs — sans ça, « hors zone connue » mélange
+     une position hors réseau, un chargement de shard échoué et une voie
+     simplement trop loin, et impossible de comprendre ce qui se passe. */
   function locate(lat, lon, opts) {
     opts = opts || {};
     var maxDist = opts.maxDist || 500;
+    var diag = {
+      lat: lat, lon: lon, maxDist: maxDist,
+      candidates: [], loaded: [], failed: [], nearest: null, why: '', zoneCount: 0
+    };
     var codes;
     if (opts.line) {
       codes = [opts.line];
+      diag.candidates = codes.slice();
     } else {
       codes = zonesCovering(lat, lon);
+      diag.candidates = codes.slice();
       if (opts.prefer && codes.indexOf(opts.prefer) !== -1) {
         codes = [opts.prefer].concat(codes.filter(function (c) { return c !== opts.prefer; }));
       }
-      if (!codes.length) return Promise.resolve(null);   // hors du réseau connu
-      if (codes.length > MAX_CANDIDATES) codes = codes.slice(0, MAX_CANDIDATES);
+      if (!codes.length) {
+        diag.why = 'hors-emprises';      // aucune ligne cartographiée autour
+        return Promise.resolve({ ok: false, diag: diag });
+      }
+      if (codes.length > MAX_CANDIDATES) {
+        codes = codes.slice(0, MAX_CANDIDATES);
+        diag.truncated = codes.length;
+      }
     }
-    return ensureAll(codes).then(function () {
+    diag.zoneCount = diag.candidates.length;
+    return ensureAll(codes).then(function (res) {
+      for (var i = 0; i < res.length; i++) {
+        if (res[i]) diag.loaded.push(res[i]); else diag.failed.push(codes[i]);
+      }
       var best = null;
       for (var j = 0; j < codes.length; j++) {
         var pts = lines[codes[j]];
@@ -98,7 +121,20 @@ var PkStore = (function () {
         var pr = Geo.projectOnPolyline(lat, lon, pts);
         if (pr && (best === null || pr.dist < best.dist)) { best = pr; best.line = codes[j]; }
       }
-      return (best && best.dist <= maxDist) ? best : null;
+      if (best) {
+        diag.nearest = { line: best.line, dist: Math.round(best.dist), pk: Math.round(best.pk * 1000) / 1000 };
+      }
+      if (!best) {
+        diag.why = 'donnees-indisponibles';   // candidats trouvés, aucun chargé
+        return { ok: false, diag: diag };
+      }
+      if (best.dist > maxDist) {
+        diag.why = 'voie-trop-loin';
+        return { ok: false, diag: diag };
+      }
+      diag.why = 'ok';
+      return { ok: true, line: best.line, pk: best.pk, dist: best.dist,
+               offset: best.offset, segBearing: best.segBearing, diag: diag };
     });
   }
 
